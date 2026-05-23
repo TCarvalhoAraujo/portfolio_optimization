@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Ambiente virtual
+venv/
+env/
+.env
+
+# Dados gerados automaticamente (não versionar — rerrodar com --preset my50)
+data/cache/
+results/
+
+# CUDA compilados
+*.ptx
+*.cubin
+
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.swp

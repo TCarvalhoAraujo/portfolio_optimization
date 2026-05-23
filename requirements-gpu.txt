@@ -1,0 +1,15 @@
+# ─────────────────────────────────────────────────────────────────
+# Dependências GPU — instalar APÓS requirements.txt
+# Requer: NVIDIA GPU + driver CUDA instalado
+#
+# Verifique sua versão CUDA:
+#   nvidia-smi
+#
+# Instale com:
+#   pip install -r requirements-gpu.txt
+#
+# Alternativa via conda (recomendado em caso de conflito):
+#   conda install -c conda-forge pycuda
+# ─────────────────────────────────────────────────────────────────
+
+pycuda>=2022.1            # Interface Python para CUDA (requer CUDA Toolkit instalado)

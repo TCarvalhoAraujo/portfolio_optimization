@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────
+# portfolio_cuda — Dependências do Projeto
+# ─────────────────────────────────────────────────────────────────
+#
+# Instalação (CPU — funciona em qualquer máquina):
+#   pip install -r requirements.txt
+#
+# Instalação (GPU — apenas em máquinas com NVIDIA + CUDA instalado):
+#   pip install -r requirements.txt
+#   pip install -r requirements-gpu.txt
+#
+# Verifique sua versão CUDA antes de instalar pycuda:
+#   nvidia-smi
+# ─────────────────────────────────────────────────────────────────
+
+# ── Dados financeiros ─────────────────────────────────────────────
+yahooquery>=2.3.7         # Download de dados históricos (API v8 do Yahoo Finance)
+pandas>=2.0.0             # Manipulação de DataFrames
+numpy>=1.24.0             # Operações numéricas / arrays
+
+# ── Computação científica ─────────────────────────────────────────
+scipy>=1.11.0             # Testes estatísticos (normalidade, etc.)
+
+# ── Machine Learning ──────────────────────────────────────────────
+scikit-learn>=1.3.0       # Random Forest, métricas, pré-processamento
+xgboost>=2.0.0            # Gradient Boosting para seleção de portfólios
+joblib>=1.3.0             # Serialização de modelos treinados
+pyarrow>=14.0.0           # Serialização Parquet para dataset de treino
+
+# ── Visualização ──────────────────────────────────────────────────
+matplotlib>=3.7.0         # Gráficos base
+seaborn>=0.13.0           # Heatmaps de correlação, distribuições
+plotly>=5.18.0            # Gráficos interativos (fronteira eficiente)
+
+# ── Utilitários ───────────────────────────────────────────────────
+tqdm>=4.66.0              # Barras de progresso
+python-dotenv>=1.0.0      # Variáveis de ambiente (.env)
+requests>=2.31.0          # Requisições HTTP
