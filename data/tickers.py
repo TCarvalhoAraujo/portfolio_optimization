@@ -28,6 +28,7 @@ TECHNOLOGY = [
     "AMAT",  # Applied Materials
     "MU",    # Micron Technology
     "LRCX",  # Lam Research
+    "ADBE",  # Adobe
 ]
 
 CONSUMER_DISCRETIONARY = [
@@ -76,6 +77,7 @@ ENERGY = [
     "SLB",   # SLB (Schlumberger)
     "EOG",   # EOG Resources
     "MPC",   # Marathon Petroleum
+    "TPL",   # Texas Pacific Land Corporation
 ]
 
 CONSUMER_STAPLES = [
@@ -93,9 +95,7 @@ INDUSTRIALS = [
     "CAT",   # Caterpillar
     "DE",    # Deere & Company
     "HON",   # Honeywell
-    "RTX",   # RTX Corporation
     "UPS",   # UPS
-    "BA",    # Boeing
     "GE",    # GE Aerospace
     "MMM",   # 3M
 ]
@@ -123,6 +123,14 @@ REAL_ESTATE = [
     "EQIX",  # Equinix
     "CCI",   # Crown Castle
     "SPG",   # Simon Property Group
+]
+
+DEFENSE = [
+    "LMT",   # Lockheed Martin
+    "NOC",   # Northrop Grumman
+    "GD",    # General Dynamics
+    "BA",    # Boeing
+    "RTX",   # RTX Corporation
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -241,6 +249,7 @@ SECTORS = {
     "Communication":          COMMUNICATION,
     "Utilities":              UTILITIES,
     "Real Estate":            REAL_ESTATE,
+    "Defense":               DEFENSE,
 }
 
 
