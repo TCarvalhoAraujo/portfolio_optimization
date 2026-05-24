@@ -69,7 +69,7 @@ ALGORITMO POR THREAD (id = s)
 /* ─────────────────────────────────────────────────────────────────────────
    KERNEL PRINCIPAL
    ───────────────────────────────────────────────────────────────────────── */
-__global__ void mc_gbm_kernel(
+extern "C" __global__ void mc_gbm_kernel(
     /* Parâmetros do modelo GBM ─────────────────────────── */
     const float* __restrict__ drift,       // (mu - 0.5*sigma²)*dt  [n_assets]
     const float* __restrict__ diffusion,   // sigma * sqrt(dt)       [n_assets]
@@ -178,7 +178,7 @@ __global__ void mc_gbm_kernel(
    Executa uma operação trivial para forçar a inicialização do contexto CUDA
    antes do benchmark. Sem isso, a primeira chamada inclui overhead de setup.
    ───────────────────────────────────────────────────────────────────────── */
-__global__ void warmup_kernel(float* dummy) {
+extern "C" __global__ void warmup_kernel(float* dummy) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx == 0) dummy[0] = 1.0f;
 }

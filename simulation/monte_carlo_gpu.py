@@ -36,10 +36,45 @@ CONFIGURAÇÃO DE GRID E BLOCK
       - Kernels com muitos registros por thread → use 128 ou menos
 """
 
+import os
 import time
 import numpy as np
 from pathlib import Path
 from typing import Optional
+
+# Garante que nvcc e cl.exe estejam no PATH antes de importar pycuda
+def _setup_cuda_path() -> None:
+    cuda_toolkit = Path("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA")
+    if cuda_toolkit.exists():
+        versions = sorted(cuda_toolkit.iterdir(), reverse=True)
+        for v in versions:
+            bin_dir = v / "bin"
+            if (bin_dir / "nvcc.exe").exists():
+                os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+                break
+
+    msvc_root = Path("C:/Program Files (x86)/Microsoft Visual Studio")
+    if msvc_root.exists():
+        for vs_ver in sorted(msvc_root.iterdir(), reverse=True):
+            tools = vs_ver / "BuildTools" / "VC" / "Tools" / "MSVC"
+            if not tools.exists():
+                continue
+            for msvc_ver in sorted(tools.iterdir(), reverse=True):
+                cl = msvc_ver / "bin" / "HostX64" / "x64" / "cl.exe"
+                if cl.exists():
+                    os.environ["PATH"] = str(cl.parent) + os.pathsep + os.environ.get("PATH", "")
+                    break
+            break
+
+    winkits = Path("C:/Program Files (x86)/Windows Kits/10/bin")
+    if winkits.exists():
+        for kit in sorted(winkits.iterdir(), reverse=True):
+            x64 = kit / "x64"
+            if x64.exists():
+                os.environ["PATH"] = str(x64) + os.pathsep + os.environ.get("PATH", "")
+                break
+
+_setup_cuda_path()
 
 # Importação condicional — permite importar o módulo mesmo sem GPU instalada
 try:
@@ -58,6 +93,22 @@ from simulation.monte_carlo_cpu import SimulationResult
 # ─────────────────────────────────────────────────────────────────────────────
 
 _cuda_context = None   # contexto global (inicializado uma vez)
+
+
+def _cleanup_cuda():
+    global _cuda_context
+    if _cuda_context is not None:
+        try:
+            _cuda_context.pop()
+        except Exception:
+            pass
+        _cuda_context = None
+
+
+if HAS_CUDA:
+    import atexit
+    atexit.register(_cleanup_cuda)
+
 
 def init_cuda(device_id: int = 0) -> None:
     """
@@ -148,7 +199,7 @@ def _compile_kernel(n_assets: int) -> tuple:
         kernel_code,
         options=options,
         include_dirs=[str(kernel_path.parent)],
-        no_extern_c=False,
+        no_extern_c=True,
     )
 
     elapsed = time.perf_counter() - t0

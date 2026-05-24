@@ -18,6 +18,7 @@ Fluxo:
     5. Exportação dos dados prontos para as simulações
 """
 
+import hashlib
 import numpy as np
 import pandas as pd
 from yahooquery import Ticker
@@ -63,7 +64,8 @@ def download_prices(
     -------
     DataFrame com datas no índice e tickers nas colunas (adjclose)
     """
-    cache_file = CACHE_DIR / f"prices_{'_'.join(sorted(tickers))}_{start}.csv"
+    ticker_hash = hashlib.md5("_".join(sorted(tickers)).encode()).hexdigest()[:12]
+    cache_file = CACHE_DIR / f"prices_{ticker_hash}_{start}.csv"
 
     if use_cache and cache_file.exists():
         print(f"[cache] Lendo preços de {cache_file.name}")
