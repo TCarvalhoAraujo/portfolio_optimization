@@ -12,10 +12,6 @@ venv/
 env/
 .env
 
-# Dados gerados automaticamente (não versionar — rerrodar com --preset my50)
-data/cache/
-results/
-
 # CUDA compilados
 *.ptx
 *.cubin
