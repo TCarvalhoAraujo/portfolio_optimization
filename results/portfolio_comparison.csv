@@ -1,0 +1,5 @@
+Portfólio,Sharpe,Sortino,Retorno,Volatilidade,VaR 95%,CVaR 95%,P(perda)
+ML-Selecionado,1.538,3.385,18.17%,8.56%,5.02%,2.11%,0.99%
+1/N (igualitário),0.613,0.872,9.94%,8.06%,-2.77%,-5.52%,10.23%
+Mínima Variância,0.578,0.789,8.65%,6.32%,-1.35%,-3.65%,7.93%
+Máx Sharpe Ingênuo,1.484,3.389,21.29%,10.98%,4.37%,0.75%,1.69%
