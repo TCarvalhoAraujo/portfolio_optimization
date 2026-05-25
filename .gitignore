@@ -14,7 +14,7 @@ env/
 
 # Dados gerados automaticamente (não versionar — rerrodar com --preset my50)
 data/cache/
-results/
+#results/
 
 # CUDA compilados
 *.ptx
