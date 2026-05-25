@@ -49,6 +49,7 @@ O target do modelo é `sharpe_sim` — maximizá-lo é equivalente a
 encontrar o portfólio na fronteira eficiente com melhor risco/retorno.
 """
 
+import time
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -65,6 +66,16 @@ from portfolio.metrics import (
     var_historical, cvar_historical, sharpe_ratio, sortino_ratio
 )
 
+try:
+    from simulation.monte_carlo_gpu import HAS_CUDA as _HAS_GPU
+    if _HAS_GPU:
+        from simulation.monte_carlo_gpu_batch import simulate_gpu_batch as _simulate_gpu_batch
+    else:
+        _simulate_gpu_batch = None
+except ImportError:
+    _HAS_GPU = False
+    _simulate_gpu_batch = None
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GERAÇÃO DE PESOS ALEATÓRIOS DIVERSIFICADOS
@@ -75,6 +86,7 @@ def sample_weights(
     n_portfolios: int,
     concentration: str = "mixed",
     rng: Optional[np.random.Generator] = None,
+    w_max: float = 1.0,
 ) -> np.ndarray:
     """
     Gera n_portfolios vetores de pesos aleatórios normalizados.
@@ -117,6 +129,10 @@ def sample_weights(
             rng.dirichlet(np.full(n, 3.0),  size=n3),
         ])
         rng.shuffle(W)
+
+    if w_max < 1.0:
+        W = np.clip(W, 0.0, w_max)
+        W = W / W.sum(axis=1, keepdims=True)
 
     return W.astype(np.float32)
 
@@ -208,34 +224,20 @@ def compute_labels(
     """
     Calcula métricas financeiras simuladas para cada portfólio.
 
-    Para n_portfolios portfólios, executa n_sims_per_portfolio simulações
-    Monte Carlo cada — e extrai Sharpe, VaR, retorno, etc.
+    GPU disponível → simulate_gpu_batch: um único kernel launch cobre todos os
+    n_portfolios × n_sims_per_portfolio trabalhos em paralelo.
 
-    Custo computacional: n_portfolios × n_sims_per_portfolio simulações.
-    Para 5.000 portfólios × 2.000 sims = 10M simulações.
-    → Use a GPU para este passo quando possível!
+    CPU fallback → loop sequencial com simulate_vectorized.
 
-    Retorna DataFrame com shape (n_portfolios, n_labels).
+    Custo: n_portfolios × n_sims_per_portfolio simulações.
     """
     n_portfolios = len(weights_matrix)
-    rng          = np.random.default_rng(seed)
+    n_total      = n_portfolios * n_sims_per_portfolio
 
-    rows = []
-    for i, w in enumerate(weights_matrix):
-        if verbose and (i % max(1, n_portfolios // 10) == 0):
-            print(f"  [labels] Portfólio {i+1:>5}/{n_portfolios} "
-                  f"({100*i/n_portfolios:.0f}%)...")
+    timing = {"cpu_time": None, "gpu_time": None, "n_sims": n_total}
 
-        result = simulate_vectorized(
-            mu, sigma, chol_lower, w,
-            n_sims=n_sims_per_portfolio,
-            n_steps=n_steps,
-            trading_days=trading_days,
-            seed=int(rng.integers(0, 2**31)),
-        )
-        r = result.portfolio_returns
-
-        rows.append({
+    def _metrics_from_r(r: np.ndarray) -> dict:
+        return {
             "sharpe_sim"  : sharpe_ratio(r,  n_steps, trading_days, rf_annual),
             "sortino_sim" : sortino_ratio(r, n_steps, trading_days, rf_annual),
             "ret_mean"    : float(r.mean()),
@@ -243,9 +245,48 @@ def compute_labels(
             "var95"       : var_historical(r, 0.95),
             "cvar95"      : cvar_historical(r, 0.95),
             "prob_loss"   : float((r < 0).mean()),
-        })
+        }
 
-    return pd.DataFrame(rows)
+    # ── CPU — loop sequencial (sempre roda) ──────────────────────────────────
+    rng   = np.random.default_rng(seed)
+    seeds = [int(rng.integers(0, 2**31)) for _ in range(n_portfolios)]
+    rows  = []
+
+    t0 = time.perf_counter()
+    for i, (w, s) in enumerate(zip(weights_matrix, seeds)):
+        if verbose and (i % max(1, n_portfolios // 10) == 0):
+            print(f"  [labels/cpu] Portfólio {i+1:>5}/{n_portfolios} "
+                  f"({100*i/n_portfolios:.0f}%)...")
+        result = simulate_vectorized(
+            mu, sigma, chol_lower, w,
+            n_sims=n_sims_per_portfolio,
+            n_steps=n_steps,
+            trading_days=trading_days,
+            seed=s,
+        )
+        rows.append(_metrics_from_r(result.portfolio_returns))
+
+    t_cpu = time.perf_counter() - t0
+    timing["cpu_time"] = t_cpu
+    print(f"  [labels] CPU : {t_cpu:.1f}s  ({int(n_total / t_cpu):,} sims/s)")
+
+    # ── GPU batch — único kernel launch; sobrescreve resultados da CPU ────────
+    if _HAS_GPU and _simulate_gpu_batch is not None:
+        t0 = time.perf_counter()
+        all_returns = _simulate_gpu_batch(
+            mu, sigma, chol_lower, weights_matrix,
+            n_sims=n_sims_per_portfolio,
+            n_steps=n_steps,
+            trading_days=trading_days,
+            seed=seed,
+        )  # (n_portfolios, n_sims_per_portfolio)
+        t_gpu = time.perf_counter() - t0
+        timing["gpu_time"] = t_gpu
+        rows = [_metrics_from_r(all_returns[i]) for i in range(n_portfolios)]
+        print(f"  [labels] GPU batch: {t_gpu:.1f}s  ({int(n_total / t_gpu):,} sims/s)  "
+              f"speedup: {t_cpu / t_gpu:.1f}x")
+
+    return pd.DataFrame(rows), timing
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -261,7 +302,8 @@ def build_dataset(
     concentration: str         = "mixed",
     seed: int                  = 42,
     save_path: Optional[Path]  = None,
-) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray]:
+    w_max: float               = 1.0,
+) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, dict]:
     """
     Pipeline completo: gera pesos → features → labels → dataset.
 
@@ -295,15 +337,15 @@ def build_dataset(
 
     # 1. Amostra pesos aleatórios
     print(f"[dataset] Amostrando pesos ({concentration})...")
-    W = sample_weights(n_assets, n_portfolios, concentration, rng)
+    W = sample_weights(n_assets, n_portfolios, concentration, rng, w_max=w_max)
 
     # 2. Extrai features analíticas (sem simulação — rápido)
-    print(f"[dataset] Extraindo features...")
+    print("[dataset] Extraindo features...")
     X = extract_features(W, mu, sigma, cov_matrix, rf_annual)
 
     # 3. Calcula labels via simulação (custoso — use GPU!)
-    print(f"[dataset] Calculando labels via Monte Carlo...")
-    y = compute_labels(
+    print("[dataset] Calculando labels via Monte Carlo...")
+    y, labels_timing = compute_labels(
         W, mu, sigma, chol_lower,
         n_sims_per_portfolio=n_sims_per_portfolio,
         n_steps=n_steps,
@@ -311,7 +353,7 @@ def build_dataset(
         seed=int(rng.integers(0, 2**31)),
     )
 
-    print(f"\n[dataset] Dataset gerado:")
+    print("\n[dataset] Dataset gerado:")
     print(f"  X shape : {X.shape}")
     print(f"  y shape : {y.shape}")
     print(f"  Sharpe  : min={y['sharpe_sim'].min():.3f}  "
@@ -326,7 +368,7 @@ def build_dataset(
         np.save(save_path / "weights.npy", W)
         print(f"[dataset] Salvo em {save_path}")
 
-    return X, y, W
+    return X, y, W, labels_timing
 
 
 # ─────────────────────────────────────────────────────────────────────────────

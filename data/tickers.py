@@ -28,6 +28,7 @@ TECHNOLOGY = [
     "AMAT",  # Applied Materials
     "MU",    # Micron Technology
     "LRCX",  # Lam Research
+    "ADBE",  # Adobe
 ]
 
 CONSUMER_DISCRETIONARY = [
@@ -76,6 +77,7 @@ ENERGY = [
     "SLB",   # SLB (Schlumberger)
     "EOG",   # EOG Resources
     "MPC",   # Marathon Petroleum
+    "TPL",   # Texas Pacific Land Corporation
 ]
 
 CONSUMER_STAPLES = [
@@ -93,9 +95,7 @@ INDUSTRIALS = [
     "CAT",   # Caterpillar
     "DE",    # Deere & Company
     "HON",   # Honeywell
-    "RTX",   # RTX Corporation
     "UPS",   # UPS
-    "BA",    # Boeing
     "GE",    # GE Aerospace
     "MMM",   # 3M
 ]
@@ -123,6 +123,14 @@ REAL_ESTATE = [
     "EQIX",  # Equinix
     "CCI",   # Crown Castle
     "SPG",   # Simon Property Group
+]
+
+DEFENSE = [
+    "LMT",   # Lockheed Martin
+    "NOC",   # Northrop Grumman
+    "GD",    # General Dynamics
+    "BA",    # Boeing
+    "RTX",   # RTX Corporation
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -159,7 +167,7 @@ SP500_DIVERSIFIED_30 = [
 # Cobre 11 setores incluindo defesa, energia expandida e finanças diversificadas
 MY_DIVERSIFIED_50 = [
     # Technology (8) — hardware, software, semicondutores, nuvem
-    "AAPL", "MSFT", "NVDA", "GOOGL", "AVGO", "AMD", "ORCL", "CRM",
+    "AAPL", "MSFT", "NVDA", "GOOGL", "AVGO", "AMD", "ORCL", "ADBE",
     # Financials (8) — bancos, pagamentos, corretoras, gestoras
     "JPM", "V", "MA", "BAC", "GS", "MS", "BLK", "AXP",
     # Healthcare (5) — seguro, farmacêutica, equipamentos médicos
@@ -169,7 +177,7 @@ MY_DIVERSIFIED_50 = [
     # Consumer Staples (3) — defensivos, baixa volatilidade
     "PG", "KO", "WMT",
     # Energy (6) — petróleo integrado, E&P, serviços, refino
-    "XOM", "CVX", "COP", "EOG", "SLB", "MPC",
+    "XOM", "CVX", "TPL", "SLB", "MPC",
     # Defense & Aerospace (5) — contratos governamentais, baixa correlação com tech
     "RTX", "LMT", "NOC", "GD", "BA",
     # Industrials (4) — maquinário, logística, conglomerado
@@ -177,7 +185,7 @@ MY_DIVERSIFIED_50 = [
     # Communication (3) — streaming, telecoms, entretenimento
     "NFLX", "TMUS", "DIS",
     # Utilities (2) — defensivo, exposição a energia limpa
-    "NEE", "DUK",
+    "NEE", "AEP",
     # Real Estate (2) — REITs de infraestrutura e logística
     "AMT", "PLD",
 ]
@@ -241,6 +249,7 @@ SECTORS = {
     "Communication":          COMMUNICATION,
     "Utilities":              UTILITIES,
     "Real Estate":            REAL_ESTATE,
+    "Defense":               DEFENSE,
 }
 
 
