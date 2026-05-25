@@ -214,7 +214,7 @@ def plot_selected_stocks(ml_result: dict, data: dict,
 
     fig, ax = plt.subplots(figsize=(7, max(5, len(labels) * 0.32)))
     fig.patch.set_facecolor(BG)
-    _setup_ax(ax, f"G15 — Carteira ML Selecionada  ({n_active} ativos ativos)")
+    _setup_ax(ax, f"G15 — Carteira ML Selecionada  ({n_active} ativos)")
 
     ax.barh(labels[::-1], vals[::-1], color=colors[::-1], alpha=0.88, height=0.7)
 

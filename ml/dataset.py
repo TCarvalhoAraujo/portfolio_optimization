@@ -67,10 +67,14 @@ from portfolio.metrics import (
 )
 
 try:
-    from simulation.monte_carlo_gpu import simulate_gpu as _simulate_gpu, HAS_CUDA as _HAS_GPU
+    from simulation.monte_carlo_gpu import HAS_CUDA as _HAS_GPU
+    if _HAS_GPU:
+        from simulation.monte_carlo_gpu_batch import simulate_gpu_batch as _simulate_gpu_batch
+    else:
+        _simulate_gpu_batch = None
 except ImportError:
     _HAS_GPU = False
-    _simulate_gpu = None
+    _simulate_gpu_batch = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -220,58 +224,67 @@ def compute_labels(
     """
     Calcula métricas financeiras simuladas para cada portfólio.
 
-    Sempre roda CPU. Se GPU disponível, roda também e imprime speedup;
-    os labels finais usam os resultados da GPU.
+    GPU disponível → simulate_gpu_batch: um único kernel launch cobre todos os
+    n_portfolios × n_sims_per_portfolio trabalhos em paralelo.
 
-    Custo: n_portfolios × n_sims_per_portfolio simulações por backend.
+    CPU fallback → loop sequencial com simulate_vectorized.
+
+    Custo: n_portfolios × n_sims_per_portfolio simulações.
     """
     n_portfolios = len(weights_matrix)
     n_total      = n_portfolios * n_sims_per_portfolio
-    rng          = np.random.default_rng(seed)
-    seeds        = [int(rng.integers(0, 2**31)) for _ in range(n_portfolios)]
 
-    def _run_pass(sim_fn, label):
-        rows = []
-        for i, (w, s) in enumerate(zip(weights_matrix, seeds)):
-            if verbose and (i % max(1, n_portfolios // 10) == 0):
-                print(f"  [labels/{label}] Portfólio {i+1:>5}/{n_portfolios} "
-                      f"({100*i/n_portfolios:.0f}%)...")
-            result = sim_fn(
-                mu, sigma, chol_lower, w,
-                n_sims=n_sims_per_portfolio,
-                n_steps=n_steps,
-                trading_days=trading_days,
-                seed=s,
-            )
-            r = result.portfolio_returns
-            rows.append({
-                "sharpe_sim"  : sharpe_ratio(r,  n_steps, trading_days, rf_annual),
-                "sortino_sim" : sortino_ratio(r, n_steps, trading_days, rf_annual),
-                "ret_mean"    : float(r.mean()),
-                "ret_std"     : float(r.std()),
-                "var95"       : var_historical(r, 0.95),
-                "cvar95"      : cvar_historical(r, 0.95),
-                "prob_loss"   : float((r < 0).mean()),
-            })
-        return rows
+    timing = {"cpu_time": None, "gpu_time": None, "n_sims": n_total}
 
-    # ── CPU ──────────────────────────────────────────────────────────────────
-    t0 = time.perf_counter()
-    rows = _run_pass(simulate_vectorized, "cpu")
-    t_cpu = time.perf_counter() - t0
-    print(f"  [labels] CPU : {t_cpu:.1f}s  ({int(n_total / t_cpu):,} sims/s)")
+    def _metrics_from_r(r: np.ndarray) -> dict:
+        return {
+            "sharpe_sim"  : sharpe_ratio(r,  n_steps, trading_days, rf_annual),
+            "sortino_sim" : sortino_ratio(r, n_steps, trading_days, rf_annual),
+            "ret_mean"    : float(r.mean()),
+            "ret_std"     : float(r.std()),
+            "var95"       : var_historical(r, 0.95),
+            "cvar95"      : cvar_historical(r, 0.95),
+            "prob_loss"   : float((r < 0).mean()),
+        }
 
-    timing = {"cpu_time": t_cpu, "gpu_time": None, "n_sims": n_total}
-
-    # ── GPU (sobrescreve com resultados da GPU quando disponível) ─────────────
-    if _HAS_GPU and _simulate_gpu is not None:
+    # ── GPU batch — único kernel launch para todos os portfólios ─────────────
+    if _HAS_GPU and _simulate_gpu_batch is not None:
         t0 = time.perf_counter()
-        rows = _run_pass(_simulate_gpu, "gpu")
+        all_returns = _simulate_gpu_batch(
+            mu, sigma, chol_lower, weights_matrix,
+            n_sims=n_sims_per_portfolio,
+            n_steps=n_steps,
+            trading_days=trading_days,
+            seed=seed,
+        )  # (n_portfolios, n_sims_per_portfolio)
         t_gpu = time.perf_counter() - t0
         timing["gpu_time"] = t_gpu
-        print(f"  [labels] GPU : {t_gpu:.1f}s  ({int(n_total / t_gpu):,} sims/s)  "
-              f"speedup: {t_cpu / t_gpu:.1f}x")
+        rows = [_metrics_from_r(all_returns[i]) for i in range(n_portfolios)]
+        print(f"  [labels] GPU batch: {t_gpu:.1f}s  ({int(n_total / t_gpu):,} sims/s)")
+        return pd.DataFrame(rows), timing
 
+    # ── CPU fallback — loop sequencial ───────────────────────────────────────
+    rng   = np.random.default_rng(seed)
+    seeds = [int(rng.integers(0, 2**31)) for _ in range(n_portfolios)]
+    rows  = []
+
+    t0 = time.perf_counter()
+    for i, (w, s) in enumerate(zip(weights_matrix, seeds)):
+        if verbose and (i % max(1, n_portfolios // 10) == 0):
+            print(f"  [labels/cpu] Portfólio {i+1:>5}/{n_portfolios} "
+                  f"({100*i/n_portfolios:.0f}%)...")
+        result = simulate_vectorized(
+            mu, sigma, chol_lower, w,
+            n_sims=n_sims_per_portfolio,
+            n_steps=n_steps,
+            trading_days=trading_days,
+            seed=s,
+        )
+        rows.append(_metrics_from_r(result.portfolio_returns))
+
+    t_cpu = time.perf_counter() - t0
+    timing["cpu_time"] = t_cpu
+    print(f"  [labels] CPU: {t_cpu:.1f}s  ({int(n_total / t_cpu):,} sims/s)")
     return pd.DataFrame(rows), timing
 
 
