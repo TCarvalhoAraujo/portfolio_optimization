@@ -183,7 +183,7 @@ def _compile_kernel(n_assets: int) -> tuple:
 
     # Lê o código .cu externo
     kernel_path = Path(__file__).parent / "kernels" / "mc_kernel.cu"
-    kernel_code = kernel_path.read_text()
+    kernel_code = kernel_path.read_text(encoding="utf-8").encode("ascii", "replace").decode("ascii")
 
     options = [
         f"-DMAX_ASSETS={n_assets}",   # define MAX_ASSETS para o compilador

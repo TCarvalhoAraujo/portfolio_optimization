@@ -56,7 +56,7 @@ def _compile_batch_kernel(n_assets: int):
         return _batch_kernel_cache[n_assets].get_function("mc_gbm_batch_kernel")
 
     kernel_path = Path(__file__).parent / "kernels" / "mc_multi_portfolio_kernel.cu"
-    kernel_code = kernel_path.read_text()
+    kernel_code = kernel_path.read_text(encoding="utf-8").encode("ascii", "replace").decode("ascii")
 
     options = [
         f"-DMAX_ASSETS={n_assets}",

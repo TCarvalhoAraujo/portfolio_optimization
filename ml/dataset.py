@@ -247,7 +247,23 @@ def compute_labels(
             "prob_loss"   : float((r < 0).mean()),
         }
 
-    # ── CPU — loop sequencial (sempre roda) ──────────────────────────────────
+    # ── GPU batch — único kernel launch cobre todos os portfólios ───────────
+    if _HAS_GPU and _simulate_gpu_batch is not None:
+        t0 = time.perf_counter()
+        all_returns = _simulate_gpu_batch(
+            mu, sigma, chol_lower, weights_matrix,
+            n_sims=n_sims_per_portfolio,
+            n_steps=n_steps,
+            trading_days=trading_days,
+            seed=seed,
+        )  # (n_portfolios, n_sims_per_portfolio)
+        t_gpu = time.perf_counter() - t0
+        timing["gpu_time"] = t_gpu
+        rows = [_metrics_from_r(all_returns[i]) for i in range(n_portfolios)]
+        print(f"  [labels] GPU batch: {t_gpu:.1f}s  ({int(n_total / t_gpu):,} sims/s)")
+        return pd.DataFrame(rows), timing
+
+    # ── CPU fallback — loop sequencial quando GPU não está disponível ─────────
     rng   = np.random.default_rng(seed)
     seeds = [int(rng.integers(0, 2**31)) for _ in range(n_portfolios)]
     rows  = []
@@ -269,22 +285,6 @@ def compute_labels(
     t_cpu = time.perf_counter() - t0
     timing["cpu_time"] = t_cpu
     print(f"  [labels] CPU : {t_cpu:.1f}s  ({int(n_total / t_cpu):,} sims/s)")
-
-    # ── GPU batch — único kernel launch; sobrescreve resultados da CPU ────────
-    if _HAS_GPU and _simulate_gpu_batch is not None:
-        t0 = time.perf_counter()
-        all_returns = _simulate_gpu_batch(
-            mu, sigma, chol_lower, weights_matrix,
-            n_sims=n_sims_per_portfolio,
-            n_steps=n_steps,
-            trading_days=trading_days,
-            seed=seed,
-        )  # (n_portfolios, n_sims_per_portfolio)
-        t_gpu = time.perf_counter() - t0
-        timing["gpu_time"] = t_gpu
-        rows = [_metrics_from_r(all_returns[i]) for i in range(n_portfolios)]
-        print(f"  [labels] GPU batch: {t_gpu:.1f}s  ({int(n_total / t_gpu):,} sims/s)  "
-              f"speedup: {t_cpu / t_gpu:.1f}x")
 
     return pd.DataFrame(rows), timing
 
